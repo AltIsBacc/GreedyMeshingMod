@@ -49,6 +49,7 @@ public final class GreedyVanillaWorkState {
         greedyActive = GreedyRuntimeState.isRuntimeGreedyActive(sectionPos.x(), sectionPos.z());
         Arrays.fill(layerCacheKeys, 0L);
         Arrays.fill(layerCacheValues, null);
+        scratchLighting.resetLightCache();
     }
 
     public boolean initialized() { return initialized; }

@@ -57,6 +57,7 @@ public final class GreedyVulkanWorkState {
         this.emitted = false;
         this.captureDebug = GreedyConfig.debugWireframe() || GreedyConfig.debugTrianglesHud() || GreedyConfig.debugComparison();
         Arrays.fill(this.sectionStates, null);
+        this.scratchLighting.resetLightCache();
     }
 
     /** True once the greedy emit has run for this compile. VulkanMod calls {@code endDrawing()} once

@@ -53,6 +53,7 @@ public final class GreedySodiumWorkState {
         this.eligibleCount = 0;
         this.captureDebug = GreedyConfig.debugWireframe() || GreedyConfig.debugTrianglesHud() || GreedyConfig.debugComparison();
         Arrays.fill(this.sectionStates, null);
+        this.scratchLighting.resetLightCache();
     }
 
     public BlockState[] sectionStates() {
