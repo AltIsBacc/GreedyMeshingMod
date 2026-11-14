@@ -109,22 +109,22 @@ public final class GreedyLighting {
 
         samplePos.set(c0x, c0y, c0z);
         BlockState state0 = world.getBlockState(samplePos);
-        int i = greedyMeshing$getLightColor(world, state0, samplePos);
+        int i = cachedLightColor(world, state0, samplePos, scratch);
         float f = state0.getShadeBrightness(world, samplePos);
 
         samplePos.set(c1x, c1y, c1z);
         BlockState state1 = world.getBlockState(samplePos);
-        int j = greedyMeshing$getLightColor(world, state1, samplePos);
+        int j = cachedLightColor(world, state1, samplePos, scratch);
         float g = state1.getShadeBrightness(world, samplePos);
 
         samplePos.set(c2x, c2y, c2z);
         BlockState state2 = world.getBlockState(samplePos);
-        int k = greedyMeshing$getLightColor(world, state2, samplePos);
+        int k = cachedLightColor(world, state2, samplePos, scratch);
         float h = state2.getShadeBrightness(world, samplePos);
 
         samplePos.set(c3x, c3y, c3z);
         BlockState state3 = world.getBlockState(samplePos);
-        int l = greedyMeshing$getLightColor(world, state3, samplePos);
+        int l = cachedLightColor(world, state3, samplePos, scratch);
         float m = state3.getShadeBrightness(world, samplePos);
 
         boolean open0 = isOpen(world, samplePos, c0x + face.getStepX(), c0y + face.getStepY(), c0z + face.getStepZ());
@@ -141,7 +141,7 @@ public final class GreedyLighting {
             samplePos.set(c0x + corner2.getStepX(), c0y + corner2.getStepY(), c0z + corner2.getStepZ());
             BlockState diagonalState = world.getBlockState(samplePos);
             n = diagonalState.getShadeBrightness(world, samplePos);
-            o = greedyMeshing$getLightColor(world, diagonalState, samplePos);
+            o = cachedLightColor(world, diagonalState, samplePos, scratch);
         }
 
         float p;
@@ -153,7 +153,7 @@ public final class GreedyLighting {
             samplePos.set(c0x + corner3.getStepX(), c0y + corner3.getStepY(), c0z + corner3.getStepZ());
             BlockState diagonalState = world.getBlockState(samplePos);
             p = diagonalState.getShadeBrightness(world, samplePos);
-            q = greedyMeshing$getLightColor(world, diagonalState, samplePos);
+            q = cachedLightColor(world, diagonalState, samplePos, scratch);
         }
 
         float r;
@@ -165,7 +165,7 @@ public final class GreedyLighting {
             samplePos.set(c1x + corner2.getStepX(), c1y + corner2.getStepY(), c1z + corner2.getStepZ());
             BlockState diagonalState = world.getBlockState(samplePos);
             r = diagonalState.getShadeBrightness(world, samplePos);
-            s = greedyMeshing$getLightColor(world, diagonalState, samplePos);
+            s = cachedLightColor(world, diagonalState, samplePos, scratch);
         }
 
         float t;
@@ -177,12 +177,12 @@ public final class GreedyLighting {
             samplePos.set(c1x + corner3.getStepX(), c1y + corner3.getStepY(), c1z + corner3.getStepZ());
             BlockState diagonalState = world.getBlockState(samplePos);
             t = diagonalState.getShadeBrightness(world, samplePos);
-            u = greedyMeshing$getLightColor(world, diagonalState, samplePos);
+            u = cachedLightColor(world, diagonalState, samplePos, scratch);
         }
 
         samplePos.set(faceX, faceY, faceZ);
         BlockState faceState = world.getBlockState(samplePos);
-        int v = greedyMeshing$getLightColor(world, faceState, samplePos);
+        int v = cachedLightColor(world, faceState, samplePos, scratch);
         float w = faceState.getShadeBrightness(world, samplePos);
 
         float ao0 = (m + f + p + w) * 0.25F;
@@ -280,7 +280,7 @@ public final class GreedyLighting {
         BlockPos.MutableBlockPos samplePos = scratch.mutablePos;
         samplePos.set(worldX + face.getStepX(), worldY + face.getStepY(), worldZ + face.getStepZ());
         BlockState cornerState = world.getBlockState(samplePos);
-        int packedLight = greedyMeshing$getLightColor(world, cornerState, samplePos);
+        int packedLight = cachedLightColor(world, cornerState, samplePos, scratch);
         //? if UNOBFUSCATED {
         /*float shade = scratch.applyDirectionalShade ? world.cardinalLighting().byFace(face) : 1.0f;
         *///?} else {
@@ -318,7 +318,7 @@ public final class GreedyLighting {
             samplePos.set(worldX + face.getStepX(), worldY + face.getStepY(), worldZ + face.getStepZ());
         }
         BlockState faceState = world.getBlockState(samplePos);
-        int packedLight = greedyMeshing$getLightColor(world, faceState, samplePos);
+        int packedLight = cachedLightColor(world, faceState, samplePos, scratch);
         //? if UNOBFUSCATED {
         /*float shade = scratch.applyDirectionalShade ? world.cardinalLighting().byFace(face) : 1.0f;
         *///?} else {
@@ -352,6 +352,26 @@ public final class GreedyLighting {
         //?}
     }
 
+    /**
+     * Light lookup memoised per section build. The 3x3 neighbourhood sampled for one tile overlaps
+     * most of its neighbours' (and the face sample doubles as the next tile's corner), so a tiled
+     * quad re-asked for the same positions several times — and each ask runs the full lightmap
+     * pipeline, including other mods' hooks (LambDynLights' dynamic-light lookup alone was ~85% of
+     * the time under computeTileLighting in profiles).
+     */
+    private static int cachedLightColor(BlockAndTintGetter world, BlockState state, BlockPos.MutableBlockPos pos, Scratch scratch) {
+        long key = pos.asLong();
+        int slot = (int) ((key * 0x9E3779B97F4A7C15L) >>> (64 - Scratch.LIGHT_CACHE_BITS));
+        if (scratch.lightStamps[slot] == scratch.lightGeneration && scratch.lightKeys[slot] == key) {
+            return scratch.lightValues[slot];
+        }
+        int light = greedyMeshing$getLightColor(world, state, pos);
+        scratch.lightKeys[slot] = key;
+        scratch.lightValues[slot] = light;
+        scratch.lightStamps[slot] = scratch.lightGeneration;
+        return light;
+    }
+
     /** Packed block/sky light at a face sample, using the version-correct light API. */
     public static int mergeLightKey(BlockAndTintGetter world, BlockPos pos) {
         return greedyMeshing$getLightColor(world, world.getBlockState(pos), pos);
@@ -377,5 +397,22 @@ public final class GreedyLighting {
         // Set once per section build. False inside a Sable sub-level, whose own shader applies
         // directional shading dynamically — baking ours in on top would double it (issue #4).
         public boolean applyDirectionalShade = true;
+
+        // Direct-mapped per-build light cache (see cachedLightColor). A generation stamp makes
+        // invalidation O(1) instead of clearing the arrays on every section build.
+        static final int LIGHT_CACHE_BITS = 10;
+        private static final int LIGHT_CACHE_SIZE = 1 << LIGHT_CACHE_BITS;
+        final long[] lightKeys = new long[LIGHT_CACHE_SIZE];
+        final int[] lightValues = new int[LIGHT_CACHE_SIZE];
+        final int[] lightStamps = new int[LIGHT_CACHE_SIZE];
+        int lightGeneration = 1;
+
+        /** Drops every cached light value. Must run at the start of each section build. */
+        public void resetLightCache() {
+            if (++lightGeneration == 0) {
+                Arrays.fill(lightStamps, 0);
+                lightGeneration = 1;
+            }
+        }
     }
 }

@@ -49,6 +49,7 @@ public final class GreedyResourceReloadListener implements SimpleSynchronousReso
         GreedyCtmSupport.reload(manager);
         GreedyEligibility.clearCache();
         GreedySpriteSupport.clearCache();
+        GreedyEmissiveSupport.clearCache();
         Minecraft mc = Minecraft.getInstance();
         //? if >=26.2 {
         /*if (mc.levelExtractor != null) {
