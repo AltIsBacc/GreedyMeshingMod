@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Performance
+- **Emissive (`_e`) texture lookups are cached**: finding a block's emissive companion walked every
+  resource pack for each emitted quad (zip probes, path formatting, and a thrown exception per
+  miss). In a spark profile this was ~63% of the time inside the greedy meshing hook on chunk
+  builder threads. The result is now cached per sprite and cleared on resource reload.
+- **Per-tile lighting lookups are memoised within a section build**: adjacent tiles of a tiled quad
+  re-sampled most of the same light positions, each through the full lightmap pipeline (including
+  other mods' hooks such as dynamic lighting). Lightmap lookups for tiled quads drop by ~74% with
+  identical output.
+
 ## [0.6.1]
 
 ### Fixed
